@@ -1,0 +1,260 @@
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const Imap = require("imap");
+const { simpleParser } = require("mailparser");
+const nodemailer = require("nodemailer");
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+
+// ── Nodemailer transporter for SENDING ──────────────────────
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+});
+
+// ── Health check ─────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", gmail: GMAIL_USER });
+});
+
+// ── SEND email ───────────────────────────────────────────────
+app.post("/send", async (req, res) => {
+  const { to, subject, body } = req.body;
+  if (!to || !subject)
+    return res.status(400).json({ error: "Missing to/subject" });
+
+  try {
+    await transporter.sendMail({
+      from: `JobPilot <${GMAIL_USER}>`,
+      to,
+      subject,
+      text: body || "",
+    });
+    res.json({ success: true });
+  } catch (e) {
+    console.error("Send error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── READ inbox (IMAP) ────────────────────────────────────────
+app.get("/inbox", async (req, res) => {
+  const limit = parseInt(req.query.limit) || 20;
+
+  const imap = new Imap({
+    user: GMAIL_USER,
+    password: GMAIL_PASS,
+    host: "imap.gmail.com",
+    port: 993,
+    tls: true,
+    tlsOptions: { rejectUnauthorized: false },
+  });
+
+  const emails = [];
+  const parsePromises = [];
+
+  imap.once("ready", () => {
+    imap.openBox("INBOX", true, (err, box) => {
+      if (err) {
+        imap.end();
+        return res.status(500).json({ error: err.message });
+      }
+
+      const total = box.messages.total;
+      if (total === 0) {
+        imap.end();
+        return res.json({ emails: [] });
+      }
+
+      const start = Math.max(1, total - limit + 1);
+      const fetch = imap.seq.fetch(`${start}:${total}`, {
+        bodies: "",
+        struct: true,
+        envelope: true,
+      });
+
+      fetch.on("message", (msg) => {
+        let buffer = "";
+        msg.on("body", (stream) => {
+          stream.on("data", (chunk) => {
+            buffer += chunk.toString("utf8");
+          });
+          stream.once("end", async () => {
+            try {
+              const p = simpleParser(buffer)
+                .then((parsed) => {
+                  emails.push({
+                    id: parsed.messageId || Date.now().toString(),
+                    from: parsed.from?.text || "",
+                    fromName:
+                      parsed.from?.value?.[0]?.name || parsed.from?.text || "",
+                    subject: parsed.subject || "(no subject)",
+                    preview: (parsed.text || "")
+                      .slice(0, 120)
+                      .replace(/\n/g, " "),
+                    body: parsed.text || parsed.html || "",
+                    time: parsed.date
+                      ? new Date(parsed.date).toLocaleDateString("en-IN", {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : "",
+                    date: parsed.date || new Date(),
+                    unread: true,
+                  });
+                })
+                .catch((e) => console.error("Parse error:", e));
+
+              parsePromises.push(p);
+            } catch (e) {
+              console.error("Error parsing email:", e);
+            }
+          });
+        });
+      });
+
+      fetch.once("error", (err) => {
+        console.error("Fetch error:", err);
+      });
+
+      fetch.once("end", async () => {
+        await Promise.all(parsePromises); 
+
+        imap.end();
+        emails.sort((a, b) => new Date(b.date) - new Date(a.date));
+        res.json({ emails });
+      });
+    });
+  });
+
+  imap.once("error", (err) => {
+    console.error("IMAP error:", err.message);
+    res.status(500).json({ error: err.message });
+  });
+
+  imap.connect();
+});
+
+// ── SEARCH job-related emails ────────────────────────────────
+app.get("/inbox/jobs", async (req, res) => {
+  const JOB_KEYWORDS = [
+    "application",
+    "interview",
+    "offer",
+    "hiring",
+    "recruiter",
+    "position",
+    "role",
+    "job",
+    "career",
+    "opportunity",
+    "resume",
+    "shortlisted",
+    "assessment",
+    "onboarding",
+    "hr round",
+  ];
+
+  const imap = new Imap({
+    user: GMAIL_USER,
+    password: GMAIL_PASS,
+    host: "imap.gmail.com",
+    port: 993,
+    tls: true,
+    tlsOptions: { rejectUnauthorized: false },
+  });
+
+  const emails = [];
+
+  imap.once("ready", () => {
+    imap.openBox("INBOX", true, (err) => {
+      if (err) {
+        imap.end();
+        return res.status(500).json({ error: err.message });
+      }
+
+      // Search for emails with job-related subjects in last 90 days
+      const since = new Date();
+      since.setDate(since.getDate() - 90);
+
+      imap.search(["ALL", ["SINCE", since]], (err, results) => {
+        if (err || !results || results.length === 0) {
+          imap.end();
+          return res.json({ emails: [] });
+        }
+
+        // Take last 50
+        const uids = results.slice(-50);
+        const fetch = imap.fetch(uids, { bodies: "", envelope: true });
+
+        fetch.on("message", (msg) => {
+          let buffer = "";
+          msg.on("body", (stream) => {
+            stream.on("data", (chunk) => {
+              buffer += chunk.toString("utf8");
+            });
+            stream.once("end", async () => {
+              try {
+                const parsed = await simpleParser(buffer);
+                const subjectLower = (parsed.subject || "").toLowerCase();
+                const bodyLower = (parsed.text || "").toLowerCase();
+                const isJobRelated = JOB_KEYWORDS.some(
+                  (kw) => subjectLower.includes(kw) || bodyLower.includes(kw),
+                );
+                if (isJobRelated) {
+                  emails.push({
+                    id: parsed.messageId || Date.now().toString(),
+                    from: parsed.from?.text || "",
+                    fromName:
+                      parsed.from?.value?.[0]?.name || parsed.from?.text || "",
+                    subject: parsed.subject || "(no subject)",
+                    preview: (parsed.text || "")
+                      .slice(0, 120)
+                      .replace(/\n/g, " "),
+                    body: parsed.text || "",
+                    time: parsed.date
+                      ? new Date(parsed.date).toLocaleDateString("en-IN", {
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : "",
+                    date: parsed.date || new Date(),
+                    unread: true,
+                  });
+                }
+              } catch (e) {
+                /* skip unparseable */
+              }
+            });
+          });
+        });
+
+        fetch.once("end", () => {
+          imap.end();
+          emails.sort((a, b) => new Date(b.date) - new Date(a.date));
+          res.json({ emails });
+        });
+
+        fetch.once("error", (e) => {
+          console.error(e);
+          imap.end();
+          res.json({ emails: [] });
+        });
+      });
+    });
+  });
+
+  imap.once("error", (err) => res.status(500).json({ error: err.message }));
+  imap.connect();
+});
+
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () =>
+  console.log(`JobPilot backend running on http://localhost:${PORT}`),
+);
