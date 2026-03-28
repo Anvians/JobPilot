@@ -4,6 +4,7 @@ const cors = require("cors");
 const Imap = require("imap");
 const { simpleParser } = require("mailparser");
 const nodemailer = require("nodemailer");
+const { google } = require('googleapis');
 
 const app = express();
 app.use(cors());
@@ -24,24 +25,30 @@ app.get("/health", (req, res) => {
 });
 
 // ── SEND email ───────────────────────────────────────────────
-app.post("/send", async (req, res) => {
+app.post('/send', async (req, res) => {
   const { to, subject, body } = req.body;
-  if (!to || !subject)
-    return res.status(400).json({ error: "Missing to/subject" });
+  const authHeader = req.headers['authorization'];
+  const userToken = authHeader?.replace('Bearer ', '');
 
   try {
-    await transporter.sendMail({
-      from: `JobPilot <${GMAIL_USER}>`,
-      to,
-      subject,
-      text: body || "",
-    });
+    if (userToken) {
+      // Use user's own Gmail OAuth token
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: userToken });
+      const gmail = google.gmail({ version: 'v1', auth });
+      const message = [`From: me`, `To: ${to}`, `Subject: ${subject}`, `MIME-Version: 1.0`, `Content-Type: text/plain; charset=utf-8`, ``, body].join('\r\n');
+      const encoded = Buffer.from(message).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encoded } });
+    } else {
+      // Fallback: use app's own Gmail (nodemailer)
+      await transporter.sendMail({ from: `JobPilot <${GMAIL_USER}>`, to, subject, text: body || '' });
+    }
     res.json({ success: true });
   } catch (e) {
-    console.error("Send error:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
+
 
 // ── READ inbox (IMAP) ────────────────────────────────────────
 app.get("/inbox", async (req, res) => {
@@ -161,6 +168,67 @@ app.get("/inbox/jobs", async (req, res) => {
     "hr round",
   ];
 
+  const authHeader = req.headers["authorization"];
+  const userToken = authHeader?.replace("Bearer ", "");
+
+  if (userToken) {
+    // Use Gmail API with user's token
+    try {
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: userToken });
+      const gmail = google.gmail({ version: "v1", auth });
+      const listRes = await gmail.users.messages.list({
+        userId: "me",
+        maxResults: 50,
+        q: "subject:(job OR interview OR offer OR application OR hiring OR recruiter)",
+      });
+
+      const messages = listRes.data.messages || [];
+      const emails = await Promise.all(
+        messages.map(async (m) => {
+          const msg = await gmail.users.messages.get({
+            userId: "me",
+            id: m.id,
+            format: "full",
+          });
+
+          const headers = msg.data.payload.headers || [];
+          const getHeader = (name) =>
+            headers.find((h) => h.name === name)?.value || "";
+
+          const subjectLower = (getHeader("Subject") || "").toLowerCase();
+          const bodyLower = (msg.data.snippet || "").toLowerCase();
+          const isJobRelated = JOB_KEYWORDS.some(
+            (kw) => subjectLower.includes(kw) || bodyLower.includes(kw)
+          );
+
+          if (!isJobRelated) return null;
+
+          return {
+            id: m.id,
+            from: getHeader("From"),
+            fromName: getHeader("From").replace(/<.*>/, "").trim(),
+            subject: getHeader("Subject"),
+            preview: msg.data.snippet || "",
+            body: msg.data.snippet || "",
+            time: new Date(getHeader("Date")).toLocaleDateString("en-IN", {
+              month: "short",
+              day: "numeric",
+            }),
+            date: getHeader("Date"),
+            unread: msg.data.labelIds?.includes("UNREAD"),
+          };
+        })
+      );
+
+      return res.json({ emails: emails.filter(Boolean) });
+    } catch (e) {
+      console.error("Gmail API error:", e);
+      // fallback to IMAP if Gmail API fails
+    }
+  }
+
+  // fallback to IMAP if no token or Gmail API fails
   const imap = new Imap({
     user: GMAIL_USER,
     password: GMAIL_PASS,
@@ -179,7 +247,6 @@ app.get("/inbox/jobs", async (req, res) => {
         return res.status(500).json({ error: err.message });
       }
 
-      // Search for emails with job-related subjects in last 90 days
       const since = new Date();
       since.setDate(since.getDate() - 90);
 
@@ -189,23 +256,20 @@ app.get("/inbox/jobs", async (req, res) => {
           return res.json({ emails: [] });
         }
 
-        // Take last 50
         const uids = results.slice(-50);
         const fetch = imap.fetch(uids, { bodies: "", envelope: true });
 
         fetch.on("message", (msg) => {
           let buffer = "";
           msg.on("body", (stream) => {
-            stream.on("data", (chunk) => {
-              buffer += chunk.toString("utf8");
-            });
+            stream.on("data", (chunk) => (buffer += chunk.toString("utf8")));
             stream.once("end", async () => {
               try {
                 const parsed = await simpleParser(buffer);
                 const subjectLower = (parsed.subject || "").toLowerCase();
                 const bodyLower = (parsed.text || "").toLowerCase();
                 const isJobRelated = JOB_KEYWORDS.some(
-                  (kw) => subjectLower.includes(kw) || bodyLower.includes(kw),
+                  (kw) => subjectLower.includes(kw) || bodyLower.includes(kw)
                 );
                 if (isJobRelated) {
                   emails.push({
@@ -228,9 +292,7 @@ app.get("/inbox/jobs", async (req, res) => {
                     unread: true,
                   });
                 }
-              } catch (e) {
-                /* skip unparseable */
-              }
+              } catch {}
             });
           });
         });
