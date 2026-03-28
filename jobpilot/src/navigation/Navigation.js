@@ -1,16 +1,19 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { Text, ActivityIndicator, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useAuth } from '../data/AuthContext';
 import { useApp } from '../data/AppContext';
 import { colors } from '../data/theme';
 
+import LoginScreen from '../screens/LoginScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import { JobsScreen, JobDetailScreen } from '../screens/JobsScreen';
 import InboxScreen from '../screens/InboxScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -27,6 +30,11 @@ const screenOptions = {
   headerShadowVisible: false,
 };
 
+const TAB_ICONS = {
+  Dashboard: '◈', Jobs: '◇', Inbox: '✉',
+  Reminders: '⏰', Analytics: '◎', Profile: '◉',
+};
+
 function JobsStack() {
   return (
     <Stack.Navigator screenOptions={screenOptions}>
@@ -36,44 +44,61 @@ function JobsStack() {
   );
 }
 
-const TAB_ICONS = {
-  Dashboard: '◈',
-  Jobs: '◇',
-  Inbox: '✉',
-  Reminders: '⏰',
-  Analytics: '◎',
-};
+function MainTabs() {
+  const { unreadCount, reminders } = useApp();
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        ...screenOptions,
+        tabBarStyle: {
+          backgroundColor: colors.bg2,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          paddingBottom: 4,
+          height: 60,
+        },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.text3,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
+        tabBarIcon: ({ color }) => (
+          <Text style={{ fontSize: 16, color }}>{TAB_ICONS[route.name] || '•'}</Text>
+        ),
+        tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 9 },
+      })}
+    >
+      <Tab.Screen name="Dashboard" component={DashboardScreen}
+        options={{ headerTitle: 'JobPilot ✦', headerTitleStyle: { fontSize: 18, fontWeight: '700', color: colors.text } }} />
+      <Tab.Screen name="Jobs" component={JobsStack} options={{ headerShown: false }} />
+      <Tab.Screen name="Inbox" component={InboxScreen}
+        options={{ tabBarBadge: unreadCount > 0 ? unreadCount : undefined }} />
+      <Tab.Screen name="Reminders" component={RemindersScreen}
+        options={{ tabBarBadge: reminders.length > 0 ? reminders.length : undefined }} />
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+}
 
 export default function Navigation() {
-  const { unreadCount, reminders } = useApp();
+  const { isLoggedIn, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          ...screenOptions,
-          tabBarStyle: {
-            backgroundColor: colors.bg2,
-            borderTopColor: colors.border,
-            borderTopWidth: 1,
-            paddingBottom: 4,
-            height: 60,
-          },
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.text3,
-          tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 16, color }}>{TAB_ICONS[route.name] || '•'}</Text>
-          ),
-          tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 9 },
-        })}
-      >
-        <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ headerTitle: 'JobPilot ✦', headerTitleStyle: { fontSize: 18, fontWeight: '700', color: colors.text } }} />
-        <Tab.Screen name="Jobs" component={JobsStack} options={{ headerShown: false }} />
-        <Tab.Screen name="Inbox" component={InboxScreen} options={{ tabBarBadge: unreadCount > 0 ? unreadCount : undefined }} />
-        <Tab.Screen name="Reminders" component={RemindersScreen} options={{ tabBarBadge: reminders.length > 0 ? reminders.length : undefined }} />
-        <Tab.Screen name="Analytics" component={AnalyticsScreen} />
-      </Tab.Navigator>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {isLoggedIn ? (
+          <Stack.Screen name="Main" component={MainTabs} />
+        ) : (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        )}
+      </Stack.Navigator>
     </NavigationContainer>
   );
 }

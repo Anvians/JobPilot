@@ -1,7 +1,12 @@
-# .gitignore
+node_modules/
+.expo/
+dist/
 .env
-node_modules
-dist
-package-lock.json
-.expo
-.expo-shared
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+web-build/

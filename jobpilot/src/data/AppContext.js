@@ -1,54 +1,40 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase';
+import { BACKEND_URL } from './config';
+import { useAuth } from './AuthContext';
 
 const AppContext = createContext(null);
 
-// ── Change this to your PC's local IP address ─────────────────
-// Run `ipconfig` on Windows or `ifconfig` on Mac to find it
-// Example: http://192.168.1.5:3001
-export const BACKEND_URL = 'http://10.43.82.144:3001';
-
 export function AppProvider({ children }) {
+  const { user, getGmailToken } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [inbox, setInbox] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inboxLoading, setInboxLoading] = useState(false);
 
+  // Reload when user changes
   useEffect(() => {
-    loadJobs();
-    loadReminders();
-  }, []);
+    if (user) {
+      loadJobs();
+      loadReminders();
+    } else {
+      setJobs([]);
+      setReminders([]);
+      setInbox([]);
+    }
+  }, [user]);
 
   const loadJobs = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     if (!error && data) setJobs(data.map(dbToJob));
     setLoading(false);
   };
-
-  const loadReminders = async () => {
-    const { data, error } = await supabase
-      .from('reminders')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) setReminders(data.map(dbToReminder));
-  };
-
-  const loadInbox = useCallback(async () => {
-    setInboxLoading(true);
-    try {
-      const res = await fetch(`${BACKEND_URL}/inbox/jobs`);
-      const data = await res.json();
-      if (data.emails) setInbox(data.emails);
-    } catch (e) {
-      console.log('Inbox fetch error:', e.message);
-    }
-    setInboxLoading(false);
-  }, []);
 
   const addJob = async (job) => {
     const row = jobToDb({
@@ -57,28 +43,38 @@ export function AppProvider({ children }) {
       timeline: [{ date: new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }), event: 'Applied', type: 'blue' }],
       emails: [],
     });
+    row.user_id = user.id;
     const { data, error } = await supabase.from('jobs').insert(row).select().single();
     if (!error && data) setJobs((prev) => [dbToJob(data), ...prev]);
   };
 
   const updateJob = async (id, updates) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, ...updates } : j)));
-    await supabase.from('jobs').update(jobToDb(updates)).eq('id', id);
+    await supabase.from('jobs').update(jobToDb(updates)).eq('id', id).eq('user_id', user.id);
   };
 
   const deleteJob = async (id) => {
     setJobs((prev) => prev.filter((j) => j.id !== id));
-    await supabase.from('jobs').delete().eq('id', id);
+    await supabase.from('jobs').delete().eq('id', id).eq('user_id', user.id);
   };
 
   const addTimelineEvent = async (jobId, event) => {
     const job = jobs.find((j) => j.id === jobId);
     if (!job) return;
-    const newTimeline = [
-      ...job.timeline,
-      { date: new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }), event, type: 'blue' },
-    ];
+    const newTimeline = [...job.timeline, {
+      date: new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+      event, type: 'blue',
+    }];
     await updateJob(jobId, { timeline: newTimeline });
+  };
+
+  const loadReminders = async () => {
+    const { data, error } = await supabase
+      .from('reminders')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (!error && data) setReminders(data.map(dbToReminder));
   };
 
   const addReminder = async (reminder) => {
@@ -89,6 +85,7 @@ export function AppProvider({ children }) {
       desc: reminder.desc || '',
       time: reminder.time || '',
       job_id: reminder.jobId || null,
+      user_id: user.id,
     };
     const { data, error } = await supabase.from('reminders').insert(row).select().single();
     if (!error && data) setReminders((prev) => [...prev, dbToReminder(data)]);
@@ -96,19 +93,42 @@ export function AppProvider({ children }) {
 
   const dismissReminder = async (id) => {
     setReminders((prev) => prev.filter((r) => r.id !== id));
-    await supabase.from('reminders').delete().eq('id', id);
+    await supabase.from('reminders').delete().eq('id', id).eq('user_id', user.id);
   };
+
+  // Gmail via backend — passes user's OAuth token
+  const loadInbox = useCallback(async () => {
+    setInboxLoading(true);
+    try {
+      const token = getGmailToken();
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch(`${BACKEND_URL}/inbox/jobs`, { headers });
+      const data = await res.json();
+      if (data.emails) setInbox(data.emails);
+    } catch (e) {
+      console.log('Inbox error:', e.message);
+    }
+    setInboxLoading(false);
+  }, [user, getGmailToken]);
 
   const sendEmail = async ({ to, subject, body }) => {
     try {
+      const token = getGmailToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`${BACKEND_URL}/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ to, subject, body }),
       });
       const data = await res.json();
       if (data.success) {
-        setInbox((prev) => [{ id: Date.now().toString(), from: 'you', fromName: 'You (Sent)', subject, preview: body.slice(0, 80), body, unread: false, time: 'Just now', date: new Date() }, ...prev]);
+        setInbox((prev) => [{
+          id: Date.now().toString(), from: user.email,
+          fromName: 'You (Sent)', subject,
+          preview: body.slice(0, 80), body,
+          unread: false, time: 'Just now', date: new Date(),
+        }, ...prev]);
         return { success: true };
       }
       return { success: false, error: data.error };
@@ -140,20 +160,12 @@ export const useApp = () => useContext(AppContext);
 
 function dbToJob(row) {
   return {
-    id: row.id,
-    role: row.role || '',
-    company: row.company || '',
-    avatar: row.avatar || '??',
-    appliedDate: row.applied_date || '',
-    stage: row.stage || 'Applied',
-    salary: row.salary || '',
-    contact: row.contact || '',
-    notes: row.notes || '',
-    jobUrl: row.job_url || '',
-    resumeVersion: row.resume_version || '',
-    tags: row.tags || [],
-    timeline: row.timeline || [],
-    emails: row.emails || [],
+    id: row.id, role: row.role || '', company: row.company || '',
+    avatar: row.avatar || '??', appliedDate: row.applied_date || '',
+    stage: row.stage || 'Applied', salary: row.salary || '',
+    contact: row.contact || '', notes: row.notes || '',
+    jobUrl: row.job_url || '', resumeVersion: row.resume_version || '',
+    tags: row.tags || [], timeline: row.timeline || [], emails: row.emails || [],
   };
 }
 
@@ -177,12 +189,8 @@ function jobToDb(job) {
 
 function dbToReminder(row) {
   return {
-    id: row.id,
-    type: row.type || 'amber',
-    icon: row.icon || '⏰',
-    title: row.title || '',
-    desc: row.desc || '',
-    time: row.time || '',
-    jobId: row.job_id || null,
+    id: row.id, type: row.type || 'amber', icon: row.icon || '⏰',
+    title: row.title || '', desc: row.desc || '',
+    time: row.time || '', jobId: row.job_id || null,
   };
 }

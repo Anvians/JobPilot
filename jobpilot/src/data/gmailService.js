@@ -1,6 +1,4 @@
-import constants from 'expo-constants';
-const GMAIL_ADDRESS = constants.expoConfig.extra.GMAIL_ADDRESS;
-const GMAIL_APP_PASSWORD = constants.expoConfig.extra.GMAIL_APP_PASSWORD;
+import { GMAIL_ADDRESS, GMAIL_APP_PASSWORD } from './config';
 
 const BASE64 = (str) => {
   const bytes = new TextEncoder().encode(str);
