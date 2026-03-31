@@ -10,8 +10,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+const GMAIL_USER =
+  process.env.GMAIL_USER ||
+  process.env.EXPO_PUBLIC_GMAIL_ADDRESS ||
+  process.env.EXPO_PUBLIC_GMAIL ||
+  null;
+
+const GMAIL_PASS =
+  process.env.GMAIL_APP_PASSWORD ||
+  process.env.EXPO_PUBLIC_GMAIL_APP_PASSWORD ||
+  process.env.EXPO_PUBLIC_GMAIL_PASSWORD ||
+  null;
+
 const BACKEND_GMAIL_CONFIGURED = !!(GMAIL_USER && GMAIL_PASS);
 
 // ── Nodemailer transporter for SENDING ──────────────────────
