@@ -12,6 +12,7 @@ export function AppProvider({ children }) {
   const [inbox, setInbox] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxError, setInboxError] = useState('');
 
   // Reload when user changes
   useEffect(() => {
@@ -22,6 +23,7 @@ export function AppProvider({ children }) {
       setJobs([]);
       setReminders([]);
       setInbox([]);
+      setInboxError('');
     }
   }, [user]);
 
@@ -82,13 +84,36 @@ export function AppProvider({ children }) {
       type: reminder.type || 'amber',
       icon: reminder.icon || '⏰',
       title: reminder.title,
-      desc: reminder.desc || '',
       time: reminder.time || '',
       job_id: reminder.jobId || null,
       user_id: user.id,
     };
-    const { data, error } = await supabase.from('reminders').insert(row).select().single();
-    if (!error && data) setReminders((prev) => [...prev, dbToReminder(data)]);
+
+    const reminderDesc = reminder.desc || reminder.description || '';
+    if (reminderDesc.trim()) {
+      row.description = reminderDesc.trim();
+    }
+
+    try {
+      const { data, error } = await supabase.from('reminders').insert(row).select().single();
+      if (error) throw error;
+
+      const savedReminder = dbToReminder(data);
+      setReminders((prev) => [savedReminder, ...prev]);
+      return { success: true, reminder: savedReminder };
+    } catch (error) {
+      const localReminder = {
+        id: `local-${Date.now()}`,
+        type: row.type,
+        icon: row.icon,
+        title: row.title,
+        desc: reminderDesc,
+        time: row.time,
+        jobId: row.job_id,
+      };
+      setReminders((prev) => [localReminder, ...prev]);
+      return { success: false, localOnly: true, error: error.message || 'Could not save reminder to Supabase.' };
+    }
   };
 
   const dismissReminder = async (id) => {
@@ -96,20 +121,47 @@ export function AppProvider({ children }) {
     await supabase.from('reminders').delete().eq('id', id).eq('user_id', user.id);
   };
 
+  const addSentEmail = ({ jobId = null, from, fromName, subject, preview, body }) => {
+    const sentItem = {
+      id: `sent-${Date.now()}`,
+      from: from || user?.email || 'you',
+      fromName: fromName || 'You (Sent)',
+      subject,
+      preview: preview || body?.slice(0, 80) || '',
+      body: body || '',
+      unread: false,
+      time: 'Just now',
+      date: new Date(),
+      jobId,
+    };
+
+    setInbox((prev) => [sentItem, ...prev]);
+    return sentItem;
+  };
+
   // Gmail via backend — passes user's OAuth token
   const loadInbox = useCallback(async () => {
     setInboxLoading(true);
+    setInboxError('');
+
     try {
       const token = getGmailToken();
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await fetch(`${BACKEND_URL}/inbox/jobs`, { headers });
       const data = await res.json();
-      if (data.emails) setInbox(data.emails);
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Could not fetch inbox right now.');
+      }
+
+      setInbox(data.emails || []);
     } catch (e) {
+      setInboxError(e.message || 'Could not fetch inbox right now.');
       console.log('Inbox error:', e.message);
+    } finally {
+      setInboxLoading(false);
     }
-    setInboxLoading(false);
-  }, [user, getGmailToken]);
+  }, [getGmailToken]);
 
   const sendEmail = async ({ to, subject, body }) => {
     try {
@@ -123,12 +175,13 @@ export function AppProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        setInbox((prev) => [{
-          id: Date.now().toString(), from: user.email,
-          fromName: 'You (Sent)', subject,
-          preview: body.slice(0, 80), body,
-          unread: false, time: 'Just now', date: new Date(),
-        }, ...prev]);
+        addSentEmail({
+          from: user?.email,
+          fromName: 'You (Sent)',
+          subject,
+          preview: body.slice(0, 80),
+          body,
+        });
         return { success: true };
       }
       return { success: false, error: data.error };
@@ -144,9 +197,9 @@ export function AppProvider({ children }) {
   return (
     <AppContext.Provider value={{
       jobs, inbox, reminders,
-      loading, inboxLoading,
+      loading, inboxLoading, inboxError,
       addJob, updateJob, deleteJob, addTimelineEvent,
-      sendEmail, markEmailRead, loadInbox,
+      sendEmail, addSentEmail, markEmailRead, loadInbox,
       dismissReminder, addReminder,
       unreadCount: inbox.filter((m) => m.unread).length,
       reload: loadJobs,
@@ -190,7 +243,7 @@ function jobToDb(job) {
 function dbToReminder(row) {
   return {
     id: row.id, type: row.type || 'amber', icon: row.icon || '⏰',
-    title: row.title || '', desc: row.desc || '',
+    title: row.title || '', desc: row.description || row.desc || '',
     time: row.time || '', jobId: row.job_id || null,
   };
 }

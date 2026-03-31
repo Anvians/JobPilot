@@ -6,7 +6,11 @@ import { Card } from '../components/UI';
 
 export default function ProfileScreen() {
   const { user, signOut, getGmailToken } = useAuth();
-  const gmailConnected = !!getGmailToken();
+  const gmailToken = getGmailToken();
+  const gmailConnected = !!gmailToken;
+  const signedInWithGoogle =
+    user?.app_metadata?.provider === 'google' ||
+    user?.identities?.some((identity) => identity.provider === 'google');
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure?', [
@@ -34,12 +38,18 @@ export default function ProfileScreen() {
         <View style={styles.statusRow}>
           <View style={[styles.dot, { backgroundColor: gmailConnected ? colors.green : colors.amber }]} />
           <Text style={styles.statusText}>
-            {gmailConnected ? 'Gmail connected via Google' : 'Not connected — sign in with Google to enable'}
+            {gmailConnected
+              ? 'Gmail connected via Google'
+              : signedInWithGoogle
+                ? 'Google sign-in detected, but Gmail permission token is missing'
+                : 'Not connected — sign in with Google to enable'}
           </Text>
         </View>
         {!gmailConnected && (
           <Text style={styles.hint}>
-            Log out and sign in again using "Continue with Google" to connect Gmail.
+            {signedInWithGoogle
+              ? 'Please sign out and reconnect with Google again to grant Gmail read/send permissions.'
+              : 'Use "Continue with Google" on the login screen to connect Gmail inbox access.'}
           </Text>
         )}
       </Card>

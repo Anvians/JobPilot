@@ -9,7 +9,7 @@ import { EmptyState } from '../components/UI';
 import ComposeModal from '../components/ComposeModal';
 
 export default function InboxScreen() {
-  const { inbox, markEmailRead, sendEmail, loadInbox, inboxLoading } = useApp();
+  const { inbox, markEmailRead, sendEmail, loadInbox, inboxLoading, inboxError } = useApp();
   const [showCompose, setShowCompose] = useState(false);
   const [selected, setSelected] = useState(null);
   const [sending, setSending] = useState(false);
@@ -65,7 +65,9 @@ export default function InboxScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <EmptyState icon="📭" message="No job-related emails found" />
-              <Text style={styles.hintText}>Pull down to refresh{'\n'}Make sure your backend is running</Text>
+              <Text style={[styles.hintText, inboxError ? styles.errorText : null]}>
+                {inboxError || "Pull down to refresh\nMake sure your backend is running"}
+              </Text>
             </View>
           }
           renderItem={({ item }) => (
@@ -149,6 +151,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   loadingText: { color: colors.text2, fontSize: 13, marginTop: 14, textAlign: 'center' },
   hintText: { color: colors.text3, fontSize: 12, marginTop: 12, textAlign: 'center', lineHeight: 20 },
+  errorText: { color: colors.amber },
 
   item: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.bg },
   itemUnread: { backgroundColor: colors.bg2 },

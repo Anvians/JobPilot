@@ -4,9 +4,11 @@ export default {
   expo: {
     name: 'JobPilot',
     slug: 'jobpilot',
+    icon: './assets/icon.png',
     version: '1.0.0',
     orientation: 'portrait',
     userInterfaceStyle: 'dark',
+    scheme: 'jobpilot',
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.anvians.jobpilot',
@@ -15,18 +17,18 @@ export default {
       package: 'com.anvians.jobpilot',
       adaptiveIcon: {
         backgroundColor: '#0f0f13',
+        foregroundImage: './assets/icon.png',
       },
       splash: {
-        backgroundColor: '#0f0f13', // THIS fixes the missing color resource
-        resizeMode: 'contain', // or 'cover'
+        backgroundColor: '#0f0f13',
+        resizeMode: 'contain',
       },
     },
     extra: {
-      backendUrl: process.env.EXPO_PUBLIC_BACKEND_URL || 'https://jobpilot-wwgo.onrender.com',
-      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
-      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
-      googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '',
       eas: { projectId: '4b66f827-2ccc-4a8f-8cb2-9fbbf82fb222' },
     },
+    "plugins": [
+    "expo-font"
+  ]
   },
 };

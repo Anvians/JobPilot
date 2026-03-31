@@ -12,6 +12,7 @@ app.use(express.json());
 
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+const BACKEND_GMAIL_CONFIGURED = !!(GMAIL_USER && GMAIL_PASS);
 
 // ── Nodemailer transporter for SENDING ──────────────────────
 const transporter = nodemailer.createTransport({
@@ -21,7 +22,11 @@ const transporter = nodemailer.createTransport({
 
 // ── Health check ─────────────────────────────────────────────
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", gmail: GMAIL_USER });
+  res.json({
+    status: "ok",
+    gmail: GMAIL_USER || null,
+    gmailConfigured: BACKEND_GMAIL_CONFIGURED,
+  });
 });
 
 // ── SEND email ───────────────────────────────────────────────
@@ -41,6 +46,11 @@ app.post('/send', async (req, res) => {
       await gmail.users.messages.send({ userId: 'me', requestBody: { raw: encoded } });
     } else {
       // Fallback: use app's own Gmail (nodemailer)
+      if (!BACKEND_GMAIL_CONFIGURED) {
+        return res.status(503).json({
+          error: 'Backend Gmail is not configured. Sign in with Google or set GMAIL_USER and GMAIL_APP_PASSWORD on the server.',
+        });
+      }
       await transporter.sendMail({ from: `JobPilot <${GMAIL_USER}>`, to, subject, text: body || '' });
     }
     res.json({ success: true });
@@ -229,6 +239,12 @@ app.get("/inbox/jobs", async (req, res) => {
   }
 
   // fallback to IMAP if no token or Gmail API fails
+  if (!BACKEND_GMAIL_CONFIGURED) {
+    return res.status(503).json({
+      error: 'Backend Gmail is not configured. Sign in with Google or set GMAIL_USER and GMAIL_APP_PASSWORD on the server.',
+    });
+  }
+
   const imap = new Imap({
     user: GMAIL_USER,
     password: GMAIL_PASS,

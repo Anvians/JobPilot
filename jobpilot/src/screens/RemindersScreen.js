@@ -15,7 +15,7 @@ const TYPE_COLORS = {
 };
 
 export default function RemindersScreen({ navigation }) {
-  const { reminders, jobs, dismissReminder, addReminder, addSentEmail } = useApp();
+  const { reminders, jobs, dismissReminder, addReminder, sendEmail } = useApp();
   const [remText, setRemText] = useState('');
   const [remTime, setRemTime] = useState('');
   const [composeVisible, setComposeVisible] = useState(false);
@@ -30,11 +30,29 @@ export default function RemindersScreen({ navigation }) {
     setComposeVisible(true);
   };
 
-  const handleAddReminder = () => {
-    if (!remText.trim()) { Alert.alert('Enter reminder text'); return; }
-    addReminder({ type: 'amber', icon: '⏰', title: remText.trim(), desc: '', time: remTime.trim() || 'Custom reminder', jobId: null });
+  const handleAddReminder = async () => {
+    if (!remText.trim()) {
+      Alert.alert('Enter reminder text');
+      return;
+    }
+
+    const result = await addReminder({
+      type: 'amber',
+      icon: '⏰',
+      title: remText.trim(),
+      desc: '',
+      time: remTime.trim() || 'Custom reminder',
+      jobId: null,
+    });
+
     setRemText('');
     setRemTime('');
+
+    if (result?.success) {
+      Alert.alert('Reminder added', 'Your reminder has been saved.');
+    } else if (result?.localOnly) {
+      Alert.alert('Saved locally only', result.error || 'The reminder could not be synced to Supabase.');
+    }
   };
 
   return (
@@ -108,8 +126,9 @@ export default function RemindersScreen({ navigation }) {
         visible={composeVisible}
         onClose={() => setComposeVisible(false)}
         onSend={async ({ to, subject, body }) => {
-          addSentEmail({ from: 'you', fromName: 'You (Sent)', subject, preview: body.slice(0, 80), body });
-          Alert.alert('Sent!', `Email sent to ${to}`);
+          const result = await sendEmail({ to, subject, body });
+          if (result.success) Alert.alert('Sent!', `Email sent to ${to}`);
+          else Alert.alert('Send failed', result.error || 'Could not reach backend.');
         }}
         defaultTo={composeDefaults.to}
         defaultSubject={composeDefaults.subject}

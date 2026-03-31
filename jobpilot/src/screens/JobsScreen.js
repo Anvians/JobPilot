@@ -17,22 +17,70 @@ export function JobsScreen({ navigation, route }) {
 
   const filtered = filter === 'All' ? jobs : jobs.filter((j) => j.stage === filter);
   const allFilters = ['All', ...STAGES];
+  const stageCounts = allFilters.reduce((acc, stage) => {
+    acc[stage] = stage === 'All' ? jobs.length : jobs.filter((j) => j.stage === stage).length;
+    return acc;
+  }, {});
+  const activePipelineCount = jobs.filter((j) => !['Rejected', 'Ghosted', 'Offer'].includes(j.stage)).length;
 
   return (
     <View style={styles.container}>
       {/* Filter chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-        {allFilters.map((f) => (
-          <TouchableOpacity key={f} onPress={() => setFilter(f)} style={[styles.filterChip, filter === f && styles.filterChipActive]}>
-            <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>{f}</Text>
-          </TouchableOpacity>
-        ))}
+        {allFilters.map((f) => {
+          const active = filter === f;
+          const stageTheme = f === 'All'
+            ? { bg: colors.accentBg, text: colors.accent }
+            : (STAGE_COLORS[f] || { bg: colors.bg3, text: colors.text2 });
+
+          return (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setFilter(f)}
+              style={[
+                styles.filterChip,
+                active && styles.filterChipActive,
+                active && { backgroundColor: stageTheme.bg, borderColor: stageTheme.text },
+              ]}
+            >
+              <Text style={[
+                styles.filterChipText,
+                active && styles.filterChipTextActive,
+                active && { color: stageTheme.text },
+              ]}>
+                {f}
+              </Text>
+              <View style={[
+                styles.filterCount,
+                active && { backgroundColor: stageTheme.text },
+              ]}>
+                <Text style={[
+                  styles.filterCountText,
+                  active && { color: '#fff' },
+                ]}>
+                  {stageCounts[f]}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       <FlatList
         data={filtered}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={{ padding: 16, paddingTop: 8 }}
+        contentContainerStyle={{ padding: 16, paddingTop: 12, paddingBottom: 96 }}
+        ListHeaderComponent={(
+          <Card style={styles.jobsSummaryCard}>
+            <View style={styles.jobsSummaryTop}>
+              <Text style={styles.jobsSummaryTitle}>{filter} applications</Text>
+              <Text style={styles.jobsSummaryCount}>{filtered.length}</Text>
+            </View>
+            <Text style={styles.jobsSummarySub}>
+              {activePipelineCount} active in your pipeline • {jobs.length} total tracked
+            </Text>
+          </Card>
+        )}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={<EmptyState icon="📭" message="No jobs in this stage" />}
         renderItem={({ item }) => (
@@ -72,7 +120,7 @@ export function JobsScreen({ navigation, route }) {
 // ── Job Detail Screen ────────────────────────────────────────
 export function JobDetailScreen({ route, navigation }) {
   const { jobId } = route.params;
-  const { jobs, updateJob, deleteJob, addTimelineEvent, addSentEmail } = useApp();
+  const { jobs, updateJob, deleteJob, addTimelineEvent, sendEmail } = useApp();
   const job = jobs.find((j) => j.id === jobId);
   const [tab, setTab] = useState('info');
   const [showEdit, setShowEdit] = useState(false);
@@ -89,8 +137,9 @@ export function JobDetailScreen({ route, navigation }) {
   };
 
   const handleSend = async ({ to, subject, body }) => {
-    addSentEmail({ from: 'you', fromName: 'You (Sent)', subject, preview: body.slice(0, 80), body });
-    Alert.alert('Sent!', `Email sent to ${to}`);
+    const result = await sendEmail({ to, subject, body });
+    if (result.success) Alert.alert('Sent!', `Email sent to ${to}`);
+    else Alert.alert('Send failed', result.error || 'Could not reach backend.');
   };
 
   const confirmDelete = () => {
@@ -283,22 +332,39 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
   // filter
-  filterScroll: { borderBottomWidth: 1, borderBottomColor: colors.border },
-  filterContent: { paddingHorizontal: 14, paddingVertical: 10, gap: 8 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg3 },
-  filterChipActive: { borderColor: colors.accent, backgroundColor: colors.accentBg },
-  filterChipText: { fontSize: 12, color: colors.text2 },
-  filterChipTextActive: { color: colors.accent, fontWeight: '600' },
+  filterScroll: { borderBottomWidth: 1, borderBottomColor: colors.border, maxHeight: 72 },
+  filterContent: { paddingHorizontal: 14, paddingVertical: 12, gap: 8, alignItems: 'center' },
+  filterChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 22, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.bg3,
+  },
+  filterChipActive: { transform: [{ scale: 1.02 }] },
+  filterChipText: { fontSize: 12, color: colors.text2, fontWeight: '600' },
+  filterChipTextActive: { color: colors.accent },
+  filterCount: {
+    minWidth: 22, paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 10, backgroundColor: colors.bg4, alignItems: 'center', justifyContent: 'center',
+  },
+  filterCountText: { fontSize: 10, fontWeight: '700', color: colors.text2 },
+
+  jobsSummaryCard: { marginBottom: 12, paddingVertical: 14 },
+  jobsSummaryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  jobsSummaryTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  jobsSummaryCount: { fontSize: 22, fontWeight: '800', color: colors.accent, letterSpacing: -0.6 },
+  jobsSummarySub: { fontSize: 12, color: colors.text2, marginTop: 4 },
 
   // job card
   jobCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.bg2, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 14, padding: 14, marginBottom: 10,
+    borderRadius: 16, padding: 14, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 3,
   },
   jobInfo: { flex: 1, marginLeft: 12 },
-  jobRole: { fontSize: 14, fontWeight: '600', color: colors.text },
-  jobCompany: { fontSize: 12, color: colors.text2, marginTop: 2 },
+  jobRole: { fontSize: 15, fontWeight: '700', color: colors.text },
+  jobCompany: { fontSize: 12, color: colors.text2, marginTop: 3 },
   jobMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' },
   jobDate: { fontSize: 11, color: colors.text3 },
   jobSalary: { fontSize: 11, color: colors.green },

@@ -6,14 +6,21 @@ import { Card, StatCard, SectionHeader } from '../components/UI';
 
 export default function AnalyticsScreen() {
   const { jobs } = useApp();
-  const total = jobs.length || 1;
+  const total = jobs.length;
+  const safeTotal = total || 1;
 
   const byStage = {};
   STAGES.forEach((s) => { byStage[s] = jobs.filter((j) => j.stage === s).length; });
 
-  const responseRate = Math.round((jobs.filter((j) => j.stage !== 'Applied').length / total) * 100);
-  const offerRate = Math.round(((byStage['Offer'] || 0) / total) * 100);
-  const interviewRate = Math.round((((byStage['Interview'] || 0) + (byStage['HR Round'] || 0) + (byStage['Offer'] || 0)) / total) * 100);
+  const stageSummary = STAGES.map((stage) => ({
+    stage,
+    count: byStage[stage] || 0,
+    pct: Math.round(((byStage[stage] || 0) / safeTotal) * 100),
+  }));
+
+  const responseRate = Math.round((jobs.filter((j) => j.stage !== 'Applied').length / safeTotal) * 100);
+  const offerRate = Math.round(((byStage['Offer'] || 0) / safeTotal) * 100);
+  const interviewRate = Math.round((((byStage['Interview'] || 0) + (byStage['HR Round'] || 0) + (byStage['Offer'] || 0)) / safeTotal) * 100);
   const weeklyData = [2, 1, 3, 0, 2, 1, 1];
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const maxWeekly = Math.max(...weeklyData, 1);
@@ -35,35 +42,50 @@ export default function AnalyticsScreen() {
       {/* By stage */}
       <Card style={styles.card}>
         <SectionHeader title="Applications by stage" />
-        {STAGES.map((s) => {
-          const pct = Math.max((byStage[s] / total) * 100, 2);
-          return (
-            <View key={s} style={styles.barRow}>
-              <Text style={styles.barLabel}>{s}</Text>
-              <View style={styles.barBg}>
-                <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: STAGE_BAR_COLORS[s] }]} />
+        {stageSummary.map(({ stage, count, pct }) => (
+          <View key={stage} style={styles.stageBlock}>
+            <View style={styles.stageBlockHeader}>
+              <View style={styles.stageLabelWrap}>
+                <View style={[styles.stageDot, { backgroundColor: STAGE_BAR_COLORS[stage] }]} />
+                <Text style={styles.stageName}>{stage}</Text>
               </View>
-              <Text style={styles.barVal}>{byStage[s]}</Text>
+              <View style={styles.stageMetaWrap}>
+                <Text style={styles.stageCount}>{count}</Text>
+                <Text style={styles.stagePercent}>{pct}%</Text>
+              </View>
             </View>
-          );
-        })}
+            <View style={styles.stageTrack}>
+              <View
+                style={[
+                  styles.stageFill,
+                  {
+                    width: `${count === 0 ? 0 : Math.max(pct, 8)}%`,
+                    backgroundColor: STAGE_BAR_COLORS[stage],
+                  },
+                ]}
+              />
+            </View>
+          </View>
+        ))}
       </Card>
 
       {/* Weekly */}
       <Card style={styles.card}>
         <SectionHeader title="Weekly activity" />
-        {weekDays.map((day, i) => {
-          const pct = Math.round((weeklyData[i] / maxWeekly) * 100);
-          return (
-            <View key={day} style={styles.barRow}>
-              <Text style={[styles.barLabel, { width: 32 }]}>{day}</Text>
-              <View style={styles.barBg}>
-                <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: colors.accent, opacity: 0.7 }]} />
+        <View style={styles.weekChart}>
+          {weekDays.map((day, i) => {
+            const height = weeklyData[i] === 0 ? 8 : Math.max(18, (weeklyData[i] / maxWeekly) * 90);
+            return (
+              <View key={day} style={styles.weekCol}>
+                <Text style={styles.weekValue}>{weeklyData[i]}</Text>
+                <View style={styles.weekTrack}>
+                  <View style={[styles.weekBar, { height }]} />
+                </View>
+                <Text style={styles.weekLabel}>{day}</Text>
               </View>
-              <Text style={styles.barVal}>{weeklyData[i]}</Text>
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
       </Card>
 
       {/* Funnel bars */}
@@ -72,11 +94,18 @@ export default function AnalyticsScreen() {
         <View style={styles.funnel}>
           {['Applied', 'Screening', 'Interview', 'HR Round', 'Offer'].map((s) => {
             const count = byStage[s] || 0;
-            const pct = Math.max(Math.round((count / total) * 100), 5);
+            const pct = total ? Math.round((count / safeTotal) * 100) : 0;
+            const height = count === 0 ? 14 : Math.max(32, pct * 1.4 + 8);
+
             return (
               <View key={s} style={styles.funnelCol}>
-                <Text style={[styles.funnelCount, { color: STAGE_BAR_COLORS[s] }]}>{count}</Text>
-                <View style={[styles.funnelBar, { height: pct * 1.5, backgroundColor: STAGE_BAR_COLORS[s] }]} />
+                <View style={[styles.funnelCountPill, { borderColor: STAGE_BAR_COLORS[s] }]}>
+                  <Text style={[styles.funnelCount, { color: STAGE_BAR_COLORS[s] }]}>{count}</Text>
+                </View>
+                <View style={styles.funnelTrack}>
+                  <View style={[styles.funnelBar, { height, backgroundColor: STAGE_BAR_COLORS[s] }]} />
+                </View>
+                <Text style={styles.funnelPct}>{pct}%</Text>
                 <Text style={styles.funnelLabel}>{s.replace(' Round', '\nRound')}</Text>
               </View>
             );
@@ -120,17 +149,66 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row' },
   card: { marginTop: 14 },
 
-  barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  barLabel: { width: 78, fontSize: 11, color: colors.text2 },
-  barBg: { flex: 1, height: 20, backgroundColor: colors.bg3, borderRadius: 4, overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: 4 },
-  barVal: { width: 22, textAlign: 'right', fontSize: 11, color: colors.text3, marginLeft: 6 },
+  stageBlock: { marginBottom: 12 },
+  stageBlockHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  stageLabelWrap: { flexDirection: 'row', alignItems: 'center' },
+  stageDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
+  stageName: { fontSize: 13, fontWeight: '600', color: colors.text },
+  stageMetaWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stageCount: { fontSize: 13, fontWeight: '700', color: colors.text },
+  stagePercent: { fontSize: 11, color: colors.text3 },
+  stageTrack: { height: 12, backgroundColor: colors.bg3, borderRadius: 999, overflow: 'hidden' },
+  stageFill: { height: '100%', borderRadius: 999 },
 
-  funnel: { flexDirection: 'row', alignItems: 'flex-end', height: 140, paddingBottom: 4 },
-  funnelCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  funnelCount: { fontSize: 12, fontWeight: '600' },
-  funnelBar: { width: '70%', borderRadius: 4, minHeight: 4 },
-  funnelLabel: { fontSize: 8, color: colors.text3, textAlign: 'center' },
+  weekChart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 136,
+    paddingTop: 8,
+  },
+  weekCol: { flex: 1, alignItems: 'center', gap: 6 },
+  weekValue: { fontSize: 10, color: colors.text2, fontWeight: '600' },
+  weekTrack: {
+    width: 24,
+    height: 90,
+    borderRadius: 12,
+    backgroundColor: colors.bg3,
+    justifyContent: 'flex-end',
+    padding: 3,
+  },
+  weekBar: {
+    width: '100%',
+    borderRadius: 10,
+    backgroundColor: colors.accent,
+    opacity: 0.85,
+  },
+  weekLabel: { fontSize: 10, color: colors.text3 },
+
+  funnel: { flexDirection: 'row', alignItems: 'flex-end', height: 190, paddingTop: 8 },
+  funnelCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  funnelCountPill: {
+    minWidth: 28,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    backgroundColor: colors.bg3,
+    alignItems: 'center',
+  },
+  funnelCount: { fontSize: 12, fontWeight: '700' },
+  funnelTrack: {
+    width: '72%',
+    height: 110,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: colors.bg3,
+    borderRadius: 12,
+    paddingBottom: 6,
+  },
+  funnelBar: { width: '62%', borderRadius: 10, minHeight: 6 },
+  funnelPct: { fontSize: 10, fontWeight: '600', color: colors.text2 },
+  funnelLabel: { fontSize: 9, color: colors.text3, textAlign: 'center', lineHeight: 12 },
 
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   summaryLabel: { fontSize: 13, color: colors.text2 },

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, ActivityIndicator, View } from 'react-native';
+import { Text, ActivityIndicator, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -30,14 +31,57 @@ const screenOptions = {
   headerShadowVisible: false,
 };
 
-const TAB_ICONS = {
-  Dashboard: '◈', Jobs: '◇', Inbox: '✉',
-  Reminders: '⏰', Analytics: '◎', Profile: '◉',
+const getTabIconName = (routeName, focused) => {
+  switch (routeName) {
+    case 'Dashboard':
+      return focused ? 'grid' : 'grid-outline';
+    case 'Jobs':
+      return focused ? 'briefcase' : 'briefcase-outline';
+    case 'Inbox':
+      return focused ? 'mail' : 'mail-outline';
+    case 'Reminders':
+      return focused ? 'notifications' : 'notifications-outline';
+    case 'Analytics':
+      return focused ? 'stats-chart' : 'stats-chart-outline';
+    default:
+      return focused ? 'ellipse' : 'ellipse-outline';
+  }
 };
+
+function HeaderProfileButton({ navigation }) {
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        const parentNav = navigation.getParent();
+        if (parentNav) parentNav.navigate('Profile');
+        else navigation.navigate('Profile');
+      }}
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.accentBg,
+        borderWidth: 1,
+        borderColor: colors.border2,
+        marginRight: 4,
+      }}
+      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    >
+      <Ionicons name="person-outline" size={18} color={colors.accent} />
+    </TouchableOpacity>
+  );
+}
 
 function JobsStack() {
   return (
-    <Stack.Navigator screenOptions={screenOptions}>
+    <Stack.Navigator
+      screenOptions={({ navigation }) => ({
+        ...screenOptions,
+        headerRight: () => <HeaderProfileButton navigation={navigation} />,
+      })}
+    >
       <Stack.Screen name="JobsList" component={JobsScreen} options={{ title: 'My Applications' }} />
       <Stack.Screen name="JobDetail" component={JobDetailScreen} options={{ title: 'Job Detail' }} />
     </Stack.Navigator>
@@ -48,22 +92,35 @@ function MainTabs() {
   const { unreadCount, reminders } = useApp();
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({ route, navigation }) => ({
         ...screenOptions,
+        headerRight: () => <HeaderProfileButton navigation={navigation} />,
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: colors.bg2,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingBottom: 4,
-          height: 60,
+          height: 66,
+          paddingTop: 6,
+          paddingBottom: 6,
         },
+        tabBarItemStyle: {
+          borderRadius: 12,
+          marginHorizontal: 2,
+          marginVertical: 4,
+        },
+        tabBarActiveBackgroundColor: colors.accentBg,
         tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.text3,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
-        tabBarIcon: ({ color }) => (
-          <Text style={{ fontSize: 16, color }}>{TAB_ICONS[route.name] || '•'}</Text>
+        tabBarInactiveTintColor: colors.text2,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginBottom: 2 },
+        tabBarIcon: ({ color, focused }) => (
+          <Ionicons name={getTabIconName(route.name, focused)} size={18} color={color} />
         ),
-        tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 9 },
+        tabBarBadgeStyle: {
+          backgroundColor: colors.accent,
+          fontSize: 9,
+          fontWeight: '700',
+        },
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen}
@@ -74,7 +131,6 @@ function MainTabs() {
       <Tab.Screen name="Reminders" component={RemindersScreen}
         options={{ tabBarBadge: reminders.length > 0 ? reminders.length : undefined }} />
       <Tab.Screen name="Analytics" component={AnalyticsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -92,11 +148,14 @@ export default function Navigation() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={screenOptions}>
         {isLoggedIn ? (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <>
+            <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+          </>
         ) : (
-          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

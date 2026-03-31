@@ -20,13 +20,29 @@ export default function LoginScreen() {
       Alert.alert('Missing fields', 'Please enter email and password.');
       return;
     }
+
     setLoading(true);
-    const { error } = mode === 'login'
+    const { data, error } = mode === 'login'
       ? await signIn(email.trim(), password)
       : await signUp(email.trim(), password);
     setLoading(false);
-    if (error) Alert.alert('Error', error.message);
-    else if (mode === 'signup') Alert.alert('✓ Account created!', 'You can now log in.');
+
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+
+    if (mode === 'signup') {
+      const needsEmailConfirmation = !data?.session;
+      Alert.alert(
+        needsEmailConfirmation ? 'Check your email' : '✓ Account created!',
+        needsEmailConfirmation
+          ? 'Your account was created. Please verify your email before logging in.'
+          : 'Your account is ready. You can now log in.',
+      );
+      setMode('login');
+      setPassword('');
+    }
   };
 
   const handleGoogle = async () => {
