@@ -4,6 +4,7 @@ import { colors, STAGE_COLORS } from '../data/theme';
 
 // ── Stage Pill ──────────────────────────────────────────────
 export function StagePill({ stage, size = 'md' }) {
+  const styles = getStyles();
   const sc = STAGE_COLORS[stage] || STAGE_COLORS['Ghosted'];
   const fontSize = size === 'sm' ? 10 : 11;
   const px = size === 'sm' ? 7 : 9;
@@ -17,6 +18,7 @@ export function StagePill({ stage, size = 'md' }) {
 
 // ── Company Avatar ───────────────────────────────────────────
 export function Avatar({ letters, size = 40 }) {
+  const styles = getStyles();
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size * 0.25 }]}>
       <Text style={[styles.avatarText, { fontSize: size * 0.35 }]}>{letters}</Text>
@@ -26,11 +28,13 @@ export function Avatar({ letters, size = 40 }) {
 
 // ── Card ─────────────────────────────────────────────────────
 export function Card({ children, style }) {
+  const styles = getStyles();
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
 // ── Button ───────────────────────────────────────────────────
 export function Btn({ label, onPress, variant = 'default', size = 'md', disabled, loading, style }) {
+  const styles = getStyles();
   const isSmall = size === 'sm';
   const bg =
     variant === 'primary' ? colors.accent :
@@ -66,6 +70,7 @@ export function Btn({ label, onPress, variant = 'default', size = 'md', disabled
 
 // ── Section Header ───────────────────────────────────────────
 export function SectionHeader({ title, action, onAction }) {
+  const styles = getStyles();
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -80,6 +85,7 @@ export function SectionHeader({ title, action, onAction }) {
 
 // ── Stat Card ────────────────────────────────────────────────
 export function StatCard({ label, value, sub, valueColor }) {
+  const styles = getStyles();
   return (
     <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -91,6 +97,7 @@ export function StatCard({ label, value, sub, valueColor }) {
 
 // ── Tag ──────────────────────────────────────────────────────
 export function Tag({ label }) {
+  const styles = getStyles();
   return (
     <View style={styles.tag}>
       <Text style={styles.tagText}>{label}</Text>
@@ -100,6 +107,7 @@ export function Tag({ label }) {
 
 // ── Empty State ──────────────────────────────────────────────
 export function EmptyState({ icon, message }) {
+  const styles = getStyles();
   return (
     <View style={styles.empty}>
       <Text style={styles.emptyIcon}>{icon}</Text>
@@ -110,10 +118,11 @@ export function EmptyState({ icon, message }) {
 
 // ── Divider ──────────────────────────────────────────────────
 export function Divider({ style }) {
+  const styles = getStyles();
   return <View style={[styles.divider, style]} />;
 }
 
-const styles = StyleSheet.create({
+const getStyles = () => StyleSheet.create({
   pill: { borderRadius: 20, alignSelf: 'flex-start' },
   pillText: { fontWeight: '600', letterSpacing: 0.2 },
 

@@ -5,6 +5,7 @@ import { colors, STAGES, STAGE_BAR_COLORS } from '../data/theme';
 import { Card, StatCard, SectionHeader } from '../components/UI';
 
 export default function AnalyticsScreen() {
+  const styles = createStyles();
   const { jobs } = useApp();
   const total = jobs.length;
   const safeTotal = total || 1;
@@ -143,7 +144,7 @@ export default function AnalyticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16 },
   statsRow: { flexDirection: 'row' },

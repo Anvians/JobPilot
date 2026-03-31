@@ -8,6 +8,7 @@ import { useAuth } from '../data/AuthContext';
 import { colors } from '../data/theme';
 
 export default function LoginScreen() {
+  const styles = createStyles();
   const { signIn, signUp, signInWithGoogle } = useAuth();
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [email, setEmail] = useState('');
@@ -142,7 +143,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   inner: { flexGrow: 1, justifyContent: 'center', padding: 24 },
 

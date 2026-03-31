@@ -6,6 +6,7 @@ import {
 import { colors } from '../data/theme';
 
 export default function ComposeModal({ visible, onClose, onSend, defaultTo = '', defaultSubject = '', defaultBody = '' }) {
+  const styles = createStyles();
   const [to, setTo] = useState(defaultTo);
   const [subject, setSubject] = useState(defaultSubject);
   const [body, setBody] = useState(defaultBody);
@@ -88,7 +89,7 @@ export default function ComposeModal({ visible, onClose, onSend, defaultTo = '',
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

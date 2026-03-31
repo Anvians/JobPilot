@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { BACKEND_URL } from './config';
 import { useAuth } from './AuthContext';
+import { applyTheme } from './theme';
 
 const AppContext = createContext(null);
+const THEME_MODE_KEY = 'jobpilot_theme_mode';
 
 export function AppProvider({ children }) {
   const { user, getGmailToken } = useAuth();
@@ -13,6 +16,36 @@ export function AppProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [inboxError, setInboxError] = useState('');
+  const [themeMode, setThemeModeState] = useState('dark');
+
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_MODE_KEY)
+      .then((storedMode) => {
+        const nextMode = storedMode === 'light' ? 'light' : 'dark';
+        applyTheme(nextMode);
+        setThemeModeState(nextMode);
+      })
+      .catch(() => {
+        applyTheme('dark');
+        setThemeModeState('dark');
+      });
+  }, []);
+
+  const setThemeMode = (mode) => {
+    const nextMode = mode === 'light' ? 'light' : 'dark';
+    applyTheme(nextMode);
+    setThemeModeState(nextMode);
+    AsyncStorage.setItem(THEME_MODE_KEY, nextMode).catch(() => {});
+  };
+
+  const toggleTheme = () => {
+    setThemeModeState((prev) => {
+      const nextMode = prev === 'light' ? 'dark' : 'light';
+      applyTheme(nextMode);
+      AsyncStorage.setItem(THEME_MODE_KEY, nextMode).catch(() => {});
+      return nextMode;
+    });
+  };
 
   // Reload when user changes
   useEffect(() => {
@@ -198,6 +231,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       jobs, inbox, reminders,
       loading, inboxLoading, inboxError,
+      themeMode, setThemeMode, toggleTheme,
       addJob, updateJob, deleteJob, addTimelineEvent,
       sendEmail, addSentEmail, markEmailRead, loadInbox,
       dismissReminder, addReminder,

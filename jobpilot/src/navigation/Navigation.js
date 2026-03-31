@@ -19,17 +19,24 @@ import ProfileScreen from '../screens/ProfileScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const navTheme = {
+const createNavTheme = () => ({
   ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.bg2, border: colors.border, text: colors.text },
-};
+  colors: {
+    ...DefaultTheme.colors,
+    primary: colors.accent,
+    background: colors.bg,
+    card: colors.bg2,
+    border: colors.border,
+    text: colors.text,
+  },
+});
 
-const screenOptions = {
+const createScreenOptions = () => ({
   headerStyle: { backgroundColor: colors.bg2 },
   headerTintColor: colors.text,
   headerTitleStyle: { fontWeight: '600', color: colors.text },
   headerShadowVisible: false,
-};
+});
 
 const getTabIconName = (routeName, focused) => {
   switch (routeName) {
@@ -75,6 +82,9 @@ function HeaderProfileButton({ navigation }) {
 }
 
 function JobsStack() {
+  const { themeMode } = useApp();
+  const screenOptions = React.useMemo(() => createScreenOptions(), [themeMode]);
+
   return (
     <Stack.Navigator
       screenOptions={({ navigation }) => ({
@@ -89,7 +99,9 @@ function JobsStack() {
 }
 
 function MainTabs() {
-  const { unreadCount, reminders } = useApp();
+  const { unreadCount, reminders, themeMode } = useApp();
+  const screenOptions = React.useMemo(() => createScreenOptions(), [themeMode]);
+
   return (
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -137,6 +149,9 @@ function MainTabs() {
 
 export default function Navigation() {
   const { isLoggedIn, loading } = useAuth();
+  const { themeMode } = useApp();
+  const navTheme = React.useMemo(() => createNavTheme(), [themeMode]);
+  const screenOptions = React.useMemo(() => createScreenOptions(), [themeMode]);
 
   if (loading) {
     return (

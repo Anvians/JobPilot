@@ -15,6 +15,7 @@ const TYPE_COLORS = {
 };
 
 export default function RemindersScreen({ navigation }) {
+  const styles = createStyles();
   const { reminders, jobs, dismissReminder, addReminder, sendEmail } = useApp();
   const [remText, setRemText] = useState('');
   const [remTime, setRemTime] = useState('');
@@ -138,7 +139,7 @@ export default function RemindersScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   reminderCard: {
     flexDirection: 'row', alignItems: 'flex-start',

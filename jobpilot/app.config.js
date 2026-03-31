@@ -7,7 +7,7 @@ export default {
     icon: './assets/icon.png',
     version: '1.0.0',
     orientation: 'portrait',
-    userInterfaceStyle: 'dark',
+    userInterfaceStyle: 'automatic',
     scheme: 'jobpilot',
     ios: {
       supportsTablet: true,

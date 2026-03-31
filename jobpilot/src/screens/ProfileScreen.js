@@ -1,11 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Switch } from 'react-native';
 import { useAuth } from '../data/AuthContext';
+import { useApp } from '../data/AppContext';
 import { colors } from '../data/theme';
 import { Card } from '../components/UI';
 
 export default function ProfileScreen() {
+  const styles = createStyles();
   const { user, signOut, getGmailToken } = useAuth();
+  const { themeMode, toggleTheme } = useApp();
   const gmailToken = getGmailToken();
   const gmailConnected = !!gmailToken;
   const signedInWithGoogle =
@@ -54,6 +57,25 @@ export default function ProfileScreen() {
         )}
       </Card>
 
+      {/* Theme */}
+      <Card style={[styles.card, { marginTop: 12 }]}>
+        <Text style={styles.sectionTitle}>Appearance</Text>
+        <View style={styles.themeRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.themeTitle}>Light mode</Text>
+            <Text style={styles.themeHint}>
+              Switch between the clean light theme and the default dark look.
+            </Text>
+          </View>
+          <Switch
+            value={themeMode === 'light'}
+            onValueChange={toggleTheme}
+            thumbColor="#ffffff"
+            trackColor={{ false: colors.border2, true: colors.accent }}
+          />
+        </View>
+      </Card>
+
       {/* App info */}
       <Card style={[styles.card, { marginTop: 12 }]}>
         <Text style={styles.sectionTitle}>About</Text>
@@ -79,7 +101,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: 20 },
   avatarWrap: { alignItems: 'center', marginBottom: 28, marginTop: 12 },
   avatar: {
@@ -97,6 +119,10 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 13, color: colors.text, flex: 1 },
   hint: { fontSize: 12, color: colors.text3, marginTop: 8, lineHeight: 18 },
+
+  themeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  themeTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
+  themeHint: { fontSize: 12, color: colors.text3, marginTop: 2, lineHeight: 18 },
 
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { fontSize: 13, color: colors.text2 },

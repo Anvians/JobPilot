@@ -7,6 +7,7 @@ import { colors, STAGES } from '../data/theme';
 import { Btn } from './UI';
 
 export default function AddJobModal({ visible, onClose, onSave, editJob }) {
+  const styles = createStyles();
   const [form, setForm] = useState(
     editJob || {
       role: '', company: '', stage: 'Applied', salary: '',
@@ -83,6 +84,7 @@ export default function AddJobModal({ visible, onClose, onSave, editJob }) {
 }
 
 function Field({ label, ...props }) {
+  const styles = createStyles();
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -95,7 +97,7 @@ function Field({ label, ...props }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

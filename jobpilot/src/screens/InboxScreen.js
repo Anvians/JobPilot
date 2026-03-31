@@ -9,6 +9,7 @@ import { EmptyState } from '../components/UI';
 import ComposeModal from '../components/ComposeModal';
 
 export default function InboxScreen() {
+  const styles = createStyles();
   const { inbox, markEmailRead, sendEmail, loadInbox, inboxLoading, inboxError } = useApp();
   const [showCompose, setShowCompose] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -115,6 +116,7 @@ export default function InboxScreen() {
 }
 
 function EmailDetail({ email, onBack, showCompose, onCloseCompose, onSend, sending }) {
+  const styles = createStyles();
   const [replyOpen, setReplyOpen] = useState(false);
   return (
     <View style={styles.container}>
@@ -146,7 +148,7 @@ function EmailDetail({ email, onBack, showCompose, onCloseCompose, onSend, sendi
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   loadingText: { color: colors.text2, fontSize: 13, marginTop: 14, textAlign: 'center' },

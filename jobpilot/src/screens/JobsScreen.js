@@ -11,6 +11,7 @@ import ComposeModal from '../components/ComposeModal';
 
 // ── Jobs List Screen ─────────────────────────────────────────
 export function JobsScreen({ navigation, route }) {
+  const styles = createStyles();
   const { jobs, addJob } = useApp();
   const [filter, setFilter] = useState('All');
   const [showAdd, setShowAdd] = useState(false);
@@ -119,6 +120,7 @@ export function JobsScreen({ navigation, route }) {
 
 // ── Job Detail Screen ────────────────────────────────────────
 export function JobDetailScreen({ route, navigation }) {
+  const styles = createStyles();
   const { jobId } = route.params;
   const { jobs, updateJob, deleteJob, addTimelineEvent, sendEmail } = useApp();
   const job = jobs.find((j) => j.id === jobId);
@@ -228,6 +230,7 @@ export function JobDetailScreen({ route, navigation }) {
 }
 
 function InfoTab({ job, updateJob, openCompose }) {
+  const styles = createStyles();
   const [notes, setNotes] = useState(job.notes || '');
   return (
     <View>
@@ -272,6 +275,7 @@ function InfoTab({ job, updateJob, openCompose }) {
 }
 
 function TimelineTab({ job, addTimelineEvent }) {
+  const styles = createStyles();
   const promptEvent = () => {
     Alert.prompt('Add Event', 'Describe this event:', (text) => {
       if (text?.trim()) addTimelineEvent(job.id, text.trim());
@@ -296,6 +300,7 @@ function TimelineTab({ job, addTimelineEvent }) {
 }
 
 function EmailsTab({ job, openCompose }) {
+  const styles = createStyles();
   if (!job.emails?.length) {
     return (
       <View>
@@ -320,6 +325,7 @@ function EmailsTab({ job, openCompose }) {
 }
 
 function Row({ label, children }) {
+  const styles = createStyles();
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -328,7 +334,7 @@ function Row({ label, children }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
   // filter

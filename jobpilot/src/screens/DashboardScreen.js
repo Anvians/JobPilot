@@ -5,6 +5,7 @@ import { colors, STAGE_BAR_COLORS } from '../data/theme';
 import { Card, StatCard, SectionHeader, StagePill, Avatar } from '../components/UI';
 
 export default function DashboardScreen({ navigation }) {
+  const styles = createStyles();
   const { jobs, reminders } = useApp();
   const total = jobs.length || 1;
   const active = jobs.filter((j) => !['Rejected', 'Ghosted', 'Offer'].includes(j.stage)).length;
@@ -90,7 +91,7 @@ export default function DashboardScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = () => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16 },
   statsRow: { flexDirection: 'row' },
