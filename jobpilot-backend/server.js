@@ -427,7 +427,6 @@ Return ONLY the JSON object.`;
   }
 });
 
-ANTHROPIC_API_KEY = your_anthropic_api_key
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () =>
