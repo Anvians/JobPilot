@@ -342,6 +342,93 @@ app.get("/inbox/jobs", async (req, res) => {
   imap.connect();
 });
 
+// ── AI EMAIL SCRAPING ─────────────────────────────────────────
+app.post('/scrape-email', async (req, res) => {
+  const { emailBody, emailSubject, emailFrom } = req.body;
+  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  console.log(ANTHROPIC_KEY ? 'Anthropic key loaded' : 'Anthropic key missing');
+  if (!ANTHROPIC_KEY) {
+    return res.status(503).json({ error: 'ANTHROPIC_API_KEY not set on server' });
+  }
+
+  const prompt = `You are an email parser for a job application tracker app.
+
+Analyze this email and extract structured data. Return ONLY valid JSON, no explanation.
+
+Email From: ${emailFrom}
+Email Subject: ${emailSubject}
+Email Body: ${emailBody?.slice(0, 3000)}
+
+Determine the email type and extract fields:
+
+1. If it's a JOB OPPORTUNITY (from LinkedIn, Naukri, Indeed, Internshala, job portal, recruiter):
+{
+  "type": "opportunity",
+  "role": "job title",
+  "company": "company name or recruiter company",
+  "salary": "salary if mentioned or null",
+  "location": "location if mentioned or null",
+  "applyUrl": "application link if found or null",
+  "skills": ["skill1", "skill2"],
+  "summary": "one line description of the role"
+}
+
+2. If it's an APPLICATION CONFIRMATION (thank you for applying, application received):
+{
+  "type": "confirmation",
+  "role": "job title applied for",
+  "company": "company name",
+  "appliedDate": "today's date in YYYY-MM-DD",
+  "contact": "reply-to email if found or null",
+  "summary": "one line summary"
+}
+
+3. If it's a STATUS UPDATE (interview scheduled, rejected, offer, shortlisted):
+{
+  "type": "status_update",
+  "company": "company name",
+  "role": "job title if mentioned or null",
+  "newStage": "one of: Screening, Interview, HR Round, Offer, Rejected",
+  "interviewDate": "date and time if mentioned or null",
+  "summary": "one line summary"
+}
+
+4. If it's none of the above:
+{
+  "type": "unrelated"
+}
+
+Return ONLY the JSON object.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || '{}';
+
+    // Strip markdown code fences if present
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    res.json({ success: true, result: parsed });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+ANTHROPIC_API_KEY = your_anthropic_api_key
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () =>
   console.log(`JobPilot backend running on http://localhost:${PORT}`),
