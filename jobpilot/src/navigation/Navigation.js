@@ -15,6 +15,7 @@ import InboxScreen from '../screens/InboxScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import OpportunitiesScreen from '../screens/OpportunitiesScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -30,7 +31,10 @@ const createNavTheme = () => ({
     text: colors.text,
   },
 });
-
+const TAB_ICONS = {
+  Dashboard: '◈', Jobs: '◇', Opportunities: '🤖',
+  Inbox: '✉', Reminders: '⏰', Analytics: '◎', Profile: '◉',
+};
 const createScreenOptions = () => ({
   headerStyle: { backgroundColor: colors.bg2 },
   headerTintColor: colors.text,
@@ -138,6 +142,11 @@ function MainTabs() {
       <Tab.Screen name="Dashboard" component={DashboardScreen}
         options={{ headerTitle: 'JobPilot ✦', headerTitleStyle: { fontSize: 18, fontWeight: '700', color: colors.text } }} />
       <Tab.Screen name="Jobs" component={JobsStack} options={{ headerShown: false }} />
+      <Tab.Screen
+          name="Opportunities"
+          component={OpportunitiesScreen}
+          options={{ title: 'AI Scanner' }}
+        />
       <Tab.Screen name="Inbox" component={InboxScreen}
         options={{ tabBarBadge: unreadCount > 0 ? unreadCount : undefined }} />
       <Tab.Screen name="Reminders" component={RemindersScreen}
